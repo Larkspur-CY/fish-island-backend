@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>SSE 数据拼接演示</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f0f0f0; 
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+        }
+        .test-area { 
+            border: 2px solid #007bff; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+        }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; }
+        .result { 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            margin: 10px 0; 
+            min-height: 100px; 
+            background: #f9f9f9; 
+        }
+        .debug { 
+            background: #e8f4f8; 
+            padding: 10px; 
+            margin: 10px 0; 
+            font-family: monospace; 
+            max-height: 200px; 
+            overflow-y: auto; 
+        }
+        .highlight { 
+            background: yellow; 
+            font-weight: bold; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 SSE 数据拼接实时演示</h1>
+        <p><strong>重点演示：</strong>每次接收到数据时，如何将新数据拼接到之前的累积内容上</p>
+        
+        <div class="test-area">
+            <h3>📝 打字效果测试（逐字符拼接）</h3>
+            <button onclick="testTyping()">开始打字测试</button>
+            <button onclick="stopAll()">停止</button>
+            <div><strong>实时拼接结果：</strong></div>
+            <div id="typingResult" class="result">等待测试...</div>
+            <div><strong>拼接过程日志：</strong></div>
+            <div id="typingDebug" class="debug"></div>
+        </div>
+        
+        <div class="test-area">
+            <h3>⚙️ 处理流程测试（分步拼接）</h3>
+            <button onclick="testMock()">开始流程测试</button>
+            <button onclick="stopAll()">停止</button>
+            <div><strong>实时拼接结果：</strong></div>
+            <div id="mockResult" class="result">等待测试...</div>
+            <div><strong>拼接过程日志：</strong></div>
+            <div id="mockDebug" class="debug"></div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let currentTest = '';
+        
+        function addDebug(testType, message) {
+            const debugDiv = document.getElementById(testType + 'Debug');
+            const time = new Date().toLocaleTimeString();
+            debugDiv.innerHTML += `<div>[${time}] ${message}</div>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+        
+        function updateResult(testType, content) {
+            document.getElementById(testType + 'Result').innerHTML = content;
+        }
+        
+        function startSSE(url, testType) {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            currentTest = testType;
+            let accumulatedText = '';
+            let dataCount = 0;
+            
+            // 清空之前的显示
+            updateResult(testType, '🔄 连接中...');
+            document.getElementById(testType + 'Debug').innerHTML = '';
+            addDebug(testType, '开始连接: ' + url);
+            
+            eventSource = new EventSource(url);
+            
+            eventSource.onopen = function() {
+                addDebug(testType, '✅ 连接成功，等待数据...');
+            };
+            
+            eventSource.onmessage = function(event) {
+                dataCount++;
+                addDebug(testType, `📨 第${dataCount}次接收: "${event.data}"`);
+                
+                if (event.data === '[DONE]') {
+                    addDebug(testType, '🏁 数据接收完成！');
+                    eventSource.close();
+                    updateResult(testType, '<div>✅ 最终结果：</div><div>' + accumulatedText + '</div>');
+                    return;
+                }
+                
+                // 🔥 关键拼接逻辑
+                const oldText = accumulatedText;
+                accumulatedText += event.data;
+                
+                addDebug(testType, `🔗 拼接前: "${oldText}"`);
+                addDebug(testType, `➕ 新增内容: "${event.data}"`);
+                addDebug(testType, `🔗 拼接后: "<span class="highlight">${accumulatedText}</span>"`);
+                addDebug(testType, '---');
+                
+                // 实时更新显示
+                updateResult(testType, '<div>📝 实时拼接内容：</div><div>' + accumulatedText + '</div>');
+            };
+            
+            eventSource.onerror = function(error) {
+                addDebug(testType, '❌ 连接错误: ' + JSON.stringify(error));
+                updateResult(testType, '❌ 连接错误');
+            };
+        }
+        
+        function testTyping() {
+            startSSE('/api/chat/stream/typing?text=Hello World! 数据拼接演示', 'typing');
+        }
+        
+        function testMock() {
+            startSSE('/api/chat/stream/mock?message=测试数据拼接流程', 'mock');
+        }
+        
+        function stopAll() {
+            if (eventSource) {
+                eventSource.close();
+                addDebug(currentTest, '🛑 手动停止连接');
+            }
+        }
+    </script>
+</body>
+</html>

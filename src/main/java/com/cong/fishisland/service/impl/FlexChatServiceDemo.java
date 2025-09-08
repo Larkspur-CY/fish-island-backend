@@ -12,9 +12,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
 import javax.annotation.Resource;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import static com.cong.fishisland.datasource.ai.MockInterviewDataSource.DEFAULT_MODEL;
 
 @Service
@@ -78,5 +80,40 @@ public class FlexChatServiceDemo {
         // 其他参数保持默认值...
 
         return request; // 直接返回对象，Jackson 会自动序列化
+    }
+
+    /**
+     * 模拟流式处理数据
+     * @param message 处理消息
+     * @return 流式响应
+     */
+    public Flux<String> streamMock(String message) {
+        return Flux.interval(Duration.ofMillis(500))
+                .take(10)
+                .map(i -> {
+                    if (i == 0) {
+                        return "开始处理您的请求: " + message;
+                    } else if (i == 9) {
+                        return "处理完成！";
+                    } else {
+                        return "正在处理中... 步骤 " + i;
+                    }
+                })
+                .concatWith(Flux.just("[DONE]"));
+    }
+
+    /**
+     * 模拟打字效果
+     * @param text 要输出的文本
+     * @return 流式响应
+     */
+    public Flux<String> streamTyping(String text) {
+        return Flux.fromIterable(
+                text.chars()
+                    .mapToObj(c -> String.valueOf((char) c))
+                    .collect(Collectors.toList())
+                )
+                .delayElements(Duration.ofMillis(100))
+                .concatWith(Flux.just("[DONE]"));
     }
 }

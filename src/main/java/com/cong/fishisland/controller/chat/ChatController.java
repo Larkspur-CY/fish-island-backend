@@ -40,6 +40,7 @@ public class ChatController {
     private FlexChatServiceDemo flexChatServiceDemo;
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ApiOperation(value = "流式聊天演示")
     public Flux<String> streamChatDemo(@RequestParam String prompt) {
         return flexChatServiceDemo.streamChat(prompt);
     }
@@ -56,5 +57,17 @@ public class ChatController {
     public BaseResponse<List<UserChatResponse>> getOnlineUserList() {
       return   ResultUtils.success(webSocketService.getOnlineUserList());
 
+    }
+
+    @GetMapping(value = "/stream/mock", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ApiOperation(value = "模拟流式返回数据")
+    public Flux<String> streamMockDemo(@RequestParam(defaultValue = "Hello World") String message) {
+        return flexChatServiceDemo.streamMock(message);
+    }
+
+    @GetMapping(value = "/stream/typing", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ApiOperation(value = "模拟打字效果")
+    public Flux<String> streamTypingDemo(@RequestParam(defaultValue = "这是一个模拟的AI助手回复，演示流式输出效果。") String text) {
+        return flexChatServiceDemo.streamTyping(text);
     }
 }
