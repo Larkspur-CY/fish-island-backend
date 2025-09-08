@@ -48,6 +48,20 @@ public class TestController {
                     .body("简单测试页面未找到");
         }
     }
+    
+    @GetMapping("/compare")
+    public ResponseEntity<String> compareTestPage() {
+        try {
+            ClassPathResource resource = new ClassPathResource("static/webclient-vs-okhttp.html");
+            String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(content);
+        } catch (IOException e) {
+            return ResponseEntity.status(404)
+                    .body("对比测试页面未找到");
+        }
+    }
 
     @GetMapping("/ai/chat")
     public ResponseEntity<String> aiChatPage() {

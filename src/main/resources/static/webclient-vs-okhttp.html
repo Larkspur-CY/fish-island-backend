@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>WebClient vs OkHttp SSE 对比</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f0f0f0; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 20px; 
+            border-radius: 8px; 
+        }
+        .comparison { 
+            display: flex; 
+            gap: 20px; 
+            margin-top: 20px; 
+        }
+        .side { 
+            flex: 1; 
+            border: 2px solid #ddd; 
+            padding: 15px; 
+            border-radius: 5px; 
+        }
+        .webclient { border-color: #007bff; }
+        .okhttp { border-color: #28a745; }
+        button { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            color: white; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+        }
+        .webclient button { background: #007bff; }
+        .okhttp button { background: #28a745; }
+        .result { 
+            border: 1px solid #ddd; 
+            padding: 15px; 
+            margin: 10px 0; 
+            min-height: 100px; 
+            background: #f9f9f9; 
+        }
+        .debug { 
+            background: #e8f4f8; 
+            padding: 10px; 
+            margin: 10px 0; 
+            font-family: monospace; 
+            max-height: 200px; 
+            overflow-y: auto; 
+            font-size: 12px;
+        }
+        .highlight { 
+            background: yellow; 
+            font-weight: bold; 
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .status.connecting { background: #ffeaa7; }
+        .status.connected { background: #55a3ff; color: white; }
+        .status.completed { background: #00b894; color: white; }
+        .status.error { background: #e17055; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 WebClient vs OkHttp SSE 流式对比测试</h1>
+        <p><strong>测试目标：</strong>比较两种技术实现 SSE 流式数据处理的效果差异</p>
+        
+        <div class="comparison">
+            <!-- WebClient 测试区域 -->
+            <div class="side webclient">
+                <h3>📘 WebClient (响应式)</h3>
+                <div class="status" id="webClientStatus">待测试</div>
+                <button onclick="testWebClient()">开始 WebClient 测试</button>
+                <button onclick="stopWebClient()">停止</button>
+                
+                <div><strong>实时拼接结果：</strong></div>
+                <div id="webClientResult" class="result">等待测试...</div>
+                
+                <div><strong>处理日志：</strong></div>
+                <div id="webClientDebug" class="debug"></div>
+            </div>
+            
+            <!-- OkHttp 测试区域 -->
+            <div class="side okhttp">
+                <h3>📗 OkHttp (回调式)</h3>
+                <div class="status" id="okHttpStatus">待测试</div>
+                <button onclick="testOkHttp()">开始 OkHttp 测试</button>
+                <button onclick="stopOkHttp()">停止</button>
+                
+                <div><strong>实时拼接结果：</strong></div>
+                <div id="okHttpResult" class="result">等待测试...</div>
+                
+                <div><strong>处理日志：</strong></div>
+                <div id="okHttpDebug" class="debug"></div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+            <h4>🔍 技术对比说明：</h4>
+            <ul>
+                <li><strong>WebClient：</strong>Spring WebFlux 响应式编程，基于 Reactor Flux 流式处理</li>
+                <li><strong>OkHttp：</strong>Square 公司 HTTP 客户端，基于回调机制的异步处理</li>
+                <li><strong>预期效果：</strong>两者都应该能实现相同的 SSE 流式数据拼接效果</li>
+                <li><strong>性能差异：</strong>可以观察响应时间、内存占用、连接处理方式的区别</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let webClientEventSource = null;
+        let okHttpEventSource = null;
+        
+        // 添加状态跟踪变量
+        let webClientCompleted = false;
+        let okHttpCompleted = false;
+        
+        function updateStatus(type, status, text) {
+            const statusDiv = document.getElementById(type + 'Status');
+            statusDiv.className = 'status ' + status;
+            statusDiv.textContent = text;
+        }
+        
+        function addDebug(type, message) {
+            const debugDiv = document.getElementById(type + 'Debug');
+            const time = new Date().toLocaleTimeString();
+            debugDiv.innerHTML += `<div>[${time}] ${message}</div>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+        
+        function updateResult(type, content) {
+            document.getElementById(type + 'Result').innerHTML = content;
+        }
+        
+        function startSSETest(url, type, eventSourceVar) {
+            if (window[eventSourceVar]) {
+                window[eventSourceVar].close();
+            }
+            
+            // 重置完成状态
+            if (type === 'webClient') {
+                webClientCompleted = false;
+            } else if (type === 'okHttp') {
+                okHttpCompleted = false;
+            }
+            
+            let accumulatedText = '';
+            let dataCount = 0;
+            let startTime = Date.now();
+            
+            // 更新状态和清空显示
+            updateStatus(type, 'connecting', '连接中...');
+            updateResult(type, '🔄 连接中...');
+            document.getElementById(type + 'Debug').innerHTML = '';
+            addDebug(type, '🚀 开始连接: ' + url);
+            
+            window[eventSourceVar] = new EventSource(url);
+            
+            window[eventSourceVar].onopen = function() {
+                updateStatus(type, 'connected', '已连接');
+                addDebug(type, '✅ 连接成功，开始接收数据...');
+            };
+            
+            window[eventSourceVar].onmessage = function(event) {
+                dataCount++;
+                const elapsed = Date.now() - startTime;
+                addDebug(type, `📨 第${dataCount}次接收 (${elapsed}ms): "${event.data}"`);
+                
+                if (event.data === '[DONE]') {
+                    // 标记为完成状态
+                    if (type === 'webClient') {
+                        webClientCompleted = true;
+                    } else if (type === 'okHttp') {
+                        okHttpCompleted = true;
+                    }
+                    
+                    updateStatus(type, 'completed', '传输完成');
+                    addDebug(type, `🏁 数据接收完成！总计 ${dataCount} 次，耗时 ${elapsed}ms`);
+                    window[eventSourceVar].close();
+                    updateResult(type, '<div>✅ 最终结果：</div><div>' + accumulatedText + '</div>');
+                    return;
+                }
+                
+                // 🔥 关键拼接逻辑
+                const oldText = accumulatedText;
+                accumulatedText += event.data;
+                
+                addDebug(type, `🔗 拼接: "${oldText}" + "${event.data}" = "<span class="highlight">${accumulatedText}</span>"`);
+                
+                // 实时更新显示
+                updateResult(type, '<div>📝 实时拼接内容：</div><div>' + accumulatedText + '</div>');
+            };
+            
+            window[eventSourceVar].onerror = function(error) {
+                // 检查连接是否已经完成，避免误报错误
+                const isCompleted = (type === 'webClient' && webClientCompleted) || 
+                                   (type === 'okHttp' && okHttpCompleted);
+                                   
+                if (isCompleted || window[eventSourceVar].readyState === EventSource.CLOSED) {
+                    // 连接已正常关闭，不显示错误
+                    addDebug(type, '✅ 连接正常关闭');
+                    return;
+                }
+                
+                updateStatus(type, 'error', '连接错误');
+                addDebug(type, '❌ 连接错误: ' + JSON.stringify(error));
+                updateResult(type, '❌ 连接错误');
+            };
+        }
+        
+        function testWebClient() {
+            startSSETest('/api/chat/stream/mock?message=WebClient流式测试', 'webClient', 'webClientEventSource');
+        }
+        
+        function testOkHttp() {
+            startSSETest('/api/chat/okhttp/mock?message=OkHttp流式测试', 'okHttp', 'okHttpEventSource');
+        }
+        
+        function stopWebClient() {
+            if (webClientEventSource && webClientEventSource.readyState !== EventSource.CLOSED) {
+                webClientEventSource.close();
+                updateStatus('webClient', 'error', '手动停止');
+                addDebug('webClient', '🛑 手动停止连接');
+            }
+        }
+        
+        function stopOkHttp() {
+            if (okHttpEventSource && okHttpEventSource.readyState !== EventSource.CLOSED) {
+                okHttpEventSource.close();
+                updateStatus('okHttp', 'error', '手动停止');
+                addDebug('okHttp', '🛑 手动停止连接');
+            }
+        }
+    </script>
+</body>
+</html>

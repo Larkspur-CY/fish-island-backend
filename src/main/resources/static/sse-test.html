@@ -78,6 +78,16 @@
             <div><strong>拼接过程日志：</strong></div>
             <div id="mockDebug" class="debug"></div>
         </div>
+        
+        <div class="test-area">
+            <h3>🚀 OkHttp 版本测试（与 WebClient 对比）</h3>
+            <button onclick="testOkHttpMock()">OkHttp Mock 测试</button>
+            <button onclick="stopAll()">停止</button>
+            <div><strong>实时拼接结果：</strong></div>
+            <div id="okhttpResult" class="result">等待测试...</div>
+            <div><strong>拼接过程日志：</strong></div>
+            <div id="okhttpDebug" class="debug"></div>
+        </div>
     </div>
 
     <script>
@@ -151,6 +161,10 @@
         
         function testMock() {
             startSSE('/api/chat/stream/mock?message=测试数据拼接流程', 'mock');
+        }
+        
+        function testOkHttpMock() {
+            startSSE('/api/chat/okhttp/mock?message=OkHttp测试数据拼接', 'okhttp');
         }
         
         function stopAll() {
