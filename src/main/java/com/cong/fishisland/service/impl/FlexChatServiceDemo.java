@@ -386,6 +386,64 @@ public class FlexChatServiceDemo {
         });
     }
     
+    /**
+     * 文件上传进度 - 使用 ServerSentEvent
+     */
+    public Flux<ServerSentEvent<String>> streamFileUploadServerSentEvents(String filename) {
+        return Flux.create(sink -> new Thread(() -> {
+            try {
+                // 开始上传
+                sink.next(ServerSentEvent.<String>builder()
+                        .id("upload_start")
+                        .event("message")
+                        .data("开始上传文件: " + filename)
+                        .build());
+                
+                Thread.sleep(300);
+                
+                // 上传进度
+                for (int progress = 0; progress <= 100; progress += 10) {
+                    if (sink.isCancelled()) {
+                        break;
+                    }
+                    
+                    String message = String.format("上传进度: %d%% (%s)", progress, filename);
+                    sink.next(ServerSentEvent.<String>builder()
+                            .id("upload_progress_" + progress)
+                            .event("progress")
+                            .data(message + " - 进度: " + progress + "%")
+                            .build());
+                    
+                    Thread.sleep(200);
+                }
+                
+                // 上传完成
+                sink.next(ServerSentEvent.<String>builder()
+                        .id("upload_complete")
+                        .event("complete")
+                        .data("文件上传完成: " + filename)
+                        .build());
+                
+                // 结束事件
+                sink.next(ServerSentEvent.<String>builder()
+                        .id("upload_done")
+                        .event("done")
+                        .data("[DONE]")
+                        .build());
+                
+                sink.complete();
+                
+            } catch (Exception e) {
+                sink.next(ServerSentEvent.<String>builder()
+                        .id("upload_error")
+                        .event("error")
+                        .data("文件上传失败: " + e.getMessage())
+                        .build());
+                sink.complete();
+            }
+        }).start());
+    }
+    
     // ========== 返回 Flux<CustomSseEvent<T>> 的方法 ==========
     
     /**

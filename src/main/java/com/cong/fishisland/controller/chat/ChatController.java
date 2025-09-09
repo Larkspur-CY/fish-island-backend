@@ -172,6 +172,13 @@ public class ChatController {
         return flexChatServiceDemo.streamAiChatServerSentEvents(question);
     }
     
+    @PostMapping(value = "/stream/file-upload-server-sent-event", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @ApiOperation(value = "文件上传进度 - Spring原生ServerSentEvent")
+    public Flux<ServerSentEvent<String>> streamFileUploadServerSentEvent(@RequestBody Map<String, Object> request) {
+        String filename = (String) request.getOrDefault("filename", "document.pdf");
+        return flexChatServiceDemo.streamFileUploadServerSentEvents(filename);
+    }
+    
     // ========== 返回 Flux<CustomSseEvent<T>> 格式接口 ==========
     
     @GetMapping(value = "/stream/custom-sse-event", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

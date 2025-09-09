@@ -291,6 +291,7 @@
                 </div>
                 
                 <button class="btn-ai" onclick="testFileUploadString()">传统格式上传</button>
+                <button class="btn-custom" onclick="testFileUploadServerSentEvent()">Spring原生上传</button>
                 <button class="btn-upload" onclick="testFileUploadCustomEvent()">自定义对象上传</button>
                 <button class="btn-stop" onclick="stopUploadCompare()">取消上传</button>
                 <button class="btn-clear" onclick="clearUploadCompareResult()">清空回复</button>
@@ -546,6 +547,40 @@
             }
         }
         
+        async function testFileUploadServerSentEvent() {
+            const filename = document.getElementById('uploadFilename').value;
+            
+            updateStatus('uploadCompare', 'connecting', '准备上传 (Spring原生)...');
+            document.getElementById('uploadProgress').style.width = '0%';
+            
+            try {
+                const response = await fetch('/api/chat/stream/file-upload-server-sent-event', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify({ filename: filename })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                updateStatus('uploadCompare', 'connected', '上传中 (Spring原生)...');
+                await processStreamResponse(response, 'uploadCompare');
+                
+            } catch (error) {
+                updateStatus('uploadCompare', 'error', '上传失败');
+                displayEvent('uploadCompare', { 
+                    event: 'error', 
+                    data: 'Spring原生格式上传失败: ' + error.message, 
+                    timestamp: Date.now() 
+                });
+            }
+        }
+        
         async function testFileUploadCustomEvent() {
             const filename = document.getElementById('uploadFilename').value;
             
@@ -654,6 +689,16 @@
                             return;
                         }
                         
+                        // 从 Spring 原生 ServerSentEvent 的 data 字段中提取进度信息
+                        if (currentEvent.event === 'progress') {
+                            // 对于 Spring 原生格式，进度信息在 data 字段中
+                            // 格式如: "上传进度: 50% (document.pdf) - 进度: 50%"
+                            const progressMatch = data.match(/进度:\s*(\d+)%/);
+                            if (progressMatch) {
+                                currentEvent.progress = parseInt(progressMatch[1]);
+                            }
+                        }
+                        
                         try {
                             // 尝试解析为JSON对象（CustomSseEvent 格式）
                             const jsonData = JSON.parse(data);
@@ -729,6 +774,14 @@
                         data: event.data,
                         timestamp: Date.now()
                     };
+                    
+                    // 从 Spring 原生 ServerSentEvent 的 data 字段中提取进度信息
+                    if (eventType === 'progress') {
+                        const progressMatch = event.data.match(/进度:\s*(\d+)%/);
+                        if (progressMatch) {
+                            eventData.progress = parseInt(progressMatch[1]);
+                        }
+                    }
                     
                     // 尝试解析JSON数据获取更多信息
                     try {
