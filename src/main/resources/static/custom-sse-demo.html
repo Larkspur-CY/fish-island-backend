@@ -79,6 +79,7 @@
         .btn-ai { background: linear-gradient(135deg, #e74c3c, #c0392b); }
         .btn-upload { background: linear-gradient(135deg, #2ecc71, #27ae60); }
         .btn-stop { background: linear-gradient(135deg, #95a5a6, #7f8c8d); }
+        .btn-clear { background: linear-gradient(135deg, #f39c12, #e67e22); }
         
         button:hover { 
             transform: translateY(-2px); 
@@ -213,6 +214,7 @@
                 
                 <button class="btn-custom" onclick="testCustomSse()">测试传统格式</button>
                 <button class="btn-stop" onclick="stopCustom()">停止</button>
+                <button class="btn-clear" onclick="clearCustomResult()">清空回复</button>
                 
                 <div><strong>返回：SSE格式字符串</strong></div>
                 <div id="customResult" class="result">等待测试...</div>
@@ -230,6 +232,7 @@
                 
                 <button class="btn-ai" onclick="testServerSentEvent()">测试Spring原生</button>
                 <button class="btn-stop" onclick="stopServerSent()">停止</button>
+                <button class="btn-clear" onclick="clearServerSentResult()">清空回复</button>
                 
                 <div><strong>返回：Spring标准SSE对象</strong></div>
                 <div id="serverSentResult" class="result">等待测试...</div>
@@ -247,6 +250,7 @@
                 
                 <button class="btn-upload" onclick="testCustomSseEvent()">测试自定义对象</button>
                 <button class="btn-stop" onclick="stopCustomEvent()">停止</button>
+                <button class="btn-clear" onclick="clearCustomEventResult()">清空回复</button>
                 
                 <div><strong>返回：CustomSseEvent对象（JSON格式）</strong></div>
                 <div id="customEventResult" class="result">等待测试...</div>
@@ -266,6 +270,7 @@
                 <button class="btn-custom" onclick="testAiChatServerSent()">Spring原生 AI</button>
                 <button class="btn-upload" onclick="testAiChatCustomEvent()">自定义对象 AI</button>
                 <button class="btn-stop" onclick="stopAiCompare()">停止</button>
+                <button class="btn-clear" onclick="clearAiCompareResult()">清空回复</button>
                 
                 <div><strong>AI回复对比：</strong></div>
                 <div id="aiCompareResult" class="result">等待提问...</div>
@@ -288,6 +293,7 @@
                 <button class="btn-ai" onclick="testFileUploadString()">传统格式上传</button>
                 <button class="btn-upload" onclick="testFileUploadCustomEvent()">自定义对象上传</button>
                 <button class="btn-stop" onclick="stopUploadCompare()">取消上传</button>
+                <button class="btn-clear" onclick="clearUploadCompareResult()">清空回复</button>
                 
                 <div><strong>上传详情对比：</strong></div>
                 <div id="uploadCompareResult" class="result">选择文件开始上传...</div>
@@ -300,6 +306,7 @@
                 
                 <button class="btn-custom" onclick="testAllFormatsComparison()">一键对比三种格式</button>
                 <button class="btn-stop" onclick="stopTraditional()">停止</button>
+                <button class="btn-clear" onclick="clearTraditionalResult()">清空回复</button>
                 
                 <div><strong>三种格式对比结果：</strong></div>
                 <div id="traditionalResult" class="result">等待对比测试...</div>
@@ -579,6 +586,7 @@
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            let currentEvent = null;
             
             while (true) {
                 const { done, value } = await reader.read();
@@ -595,19 +603,53 @@
                 buffer = lines.pop() || '';
                 
                 for (const line of lines) {
-                    if (line.trim() === '') continue;
-                    
-                    // 处理 event: 行
-                    if (line.startsWith('event:')) {
-                        // 在SSE中，event和data是分开的行，这里只是记录event类型
+                    if (line.trim() === '') {
+                        // 空行表示一个SSE事件的结束
+                        if (currentEvent) {
+                            displayEvent(type, currentEvent);
+                            
+                            // 检查是否为完成事件
+                            if (currentEvent.event === 'done') {
+                                updateStatus(type, 'completed', '传输完成');
+                                return;
+                            }
+                            
+                            currentEvent = null;
+                        }
                         continue;
                     }
                     
+                    // 处理 event: 行
+                    if (line.startsWith('event:')) {
+                        if (!currentEvent) currentEvent = { timestamp: Date.now() };
+                        currentEvent.event = line.slice(6).trim();
+                        continue;
+                    }
+                    
+                    // 处理 id: 行
+                    if (line.startsWith('id:')) {
+                        if (!currentEvent) currentEvent = { timestamp: Date.now() };
+                        currentEvent.id = line.slice(3).trim();
+                        continue;
+                    }
+                    
+                    // 处理 progress: 行
+                    if (line.startsWith('progress:')) {
+                        if (!currentEvent) currentEvent = { timestamp: Date.now() };
+                        currentEvent.progress = parseInt(line.slice(9).trim());
+                        continue;
+                    }
+                    
+                    // 处理 data: 行
                     if (line.startsWith('data:')) {
+                        if (!currentEvent) currentEvent = { timestamp: Date.now() };
                         const data = line.slice(5).trim();
                         
-                        // 检查完成标志
+                        // 检查传统的完成标志（向后兼容）
                         if (data === '[DONE]') {
+                            currentEvent.data = data;
+                            currentEvent.event = currentEvent.event || 'done';
+                            displayEvent(type, currentEvent);
                             updateStatus(type, 'completed', '传输完成');
                             return;
                         }
@@ -616,22 +658,20 @@
                             // 尝试解析为JSON对象（CustomSseEvent 格式）
                             const jsonData = JSON.parse(data);
                             
-                            // 检查是否为 done 事件且包含 [DONE] 数据
-                            if (jsonData.event === 'done' && jsonData.data === '[DONE]') {
-                                displayEvent(type, jsonData);
+                            // 如果是JSON格式，直接使用解析后的数据
+                            currentEvent = { ...currentEvent, ...jsonData, timestamp: Date.now() };
+                            
+                            // 检查是否为 done 事件
+                            if (currentEvent.event === 'done') {
+                                displayEvent(type, currentEvent);
                                 updateStatus(type, 'completed', '传输完成');
                                 return;
                             }
-                            
-                            displayEvent(type, jsonData);
                         } catch (e) {
                             // 普通文本数据
-                            displayEvent(type, { 
-                                event: 'message', 
-                                data: data, 
-                                timestamp: Date.now() 
-                            });
+                            currentEvent.data = data;
                         }
+                        continue;
                     }
                 }
             }
@@ -658,6 +698,13 @@
                     // 尝试解析JSON数据
                     const eventData = JSON.parse(event.data);
                     displayEvent(type, eventData);
+                    
+                    // 检查是否为 done 事件
+                    if (eventData.event === 'done') {
+                        updateStatus(type, 'completed', '传输完成');
+                        window[eventSourceVar].close();
+                        return;
+                    }
                 } catch (e) {
                     // 普通文本数据
                     if (event.data === '[DONE]') {
@@ -693,7 +740,8 @@
                     
                     displayEvent(type, eventData);
                     
-                    if (eventType === 'done' && (event.data === '[DONE]' || eventData.data === '[DONE]')) {
+                    // 优先检查 event 类型是否为 done
+                    if (eventType === 'done') {
                         updateStatus(type, 'completed', '传输完成');
                         window[eventSourceVar].close();
                     } else if (eventType === 'complete') {
@@ -795,6 +843,39 @@
                 traditionalEventSource.close();
             }
             updateStatus('traditional', 'error', '手动停止');
+        }
+        
+        // ========== 清空回复函数 ==========
+        
+        function clearCustomResult() {
+            document.getElementById('customResult').innerHTML = '等待测试...';
+            updateStatus('custom', 'connecting', '待测试');
+        }
+        
+        function clearServerSentResult() {
+            document.getElementById('serverSentResult').innerHTML = '等待测试...';
+            updateStatus('serverSent', 'connecting', '待测试');
+        }
+        
+        function clearCustomEventResult() {
+            document.getElementById('customEventResult').innerHTML = '等待测试...';
+            updateStatus('customEvent', 'connecting', '待测试');
+        }
+        
+        function clearAiCompareResult() {
+            document.getElementById('aiCompareResult').innerHTML = '等待提问...';
+            updateStatus('aiCompare', 'connecting', '待测试');
+        }
+        
+        function clearUploadCompareResult() {
+            document.getElementById('uploadCompareResult').innerHTML = '选择文件开始上传...';
+            document.getElementById('uploadProgress').style.width = '0%';
+            updateStatus('uploadCompare', 'connecting', '待测试');
+        }
+        
+        function clearTraditionalResult() {
+            document.getElementById('traditionalResult').innerHTML = '等待对比测试...';
+            updateStatus('traditional', 'connecting', '待测试');
         }
     </script>
 </body>

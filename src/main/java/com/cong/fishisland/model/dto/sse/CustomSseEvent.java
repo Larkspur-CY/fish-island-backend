@@ -106,43 +106,59 @@ public class CustomSseEvent<T> {
     }
     
     /**
+     * 重写toString方法，返回标准SSE格式
+     * 这样当对象被转换为字符串时，会输出正确的SSE格式
+     */
+    @Override
+    public String toString() {
+        return toSseFormat();
+    }
+    
+    /**
      * 转换为标准SSE格式字符串
      * 遵循 Server-Sent Events 规范
-     * 与Spring官方ServerSentEvent保持一致格式
+     * 与Spring官方ServerSseEvent保持一致格式
+     * 
+     * 注意：这个方法返回原始的SSE格式字符串，
+     * 会被Spring WebFlux直接输出而不再次包装
      */
     public String toSseFormat() {
-        StringBuilder sb = new StringBuilder();
+        // 由于Spring WebFlux会对Flux<String>中的每个字符串自动添加"data:"前缀
+        // 我们需要返回一个特殊格式的字符串，让Spring不要再次包装
         
-        // ID字段
+        // 解决方案：返回一个完整的SSE格式字符串，但在开头加上\r\n来“欺骗”Spring
+        StringBuilder sse = new StringBuilder();
+        
+        // 添加一个空行来让Spring认为这已经是完整的SSE数据
+        sse.append("\r\n");
+        
         if (id != null) {
-            sb.append("id:").append(id).append("\n");
+            sse.append("id:").append(id).append("\n");
         }
         
-        // Event字段  
         if (event != null) {
-            sb.append("event:").append(event).append("\n");
+            sse.append("event:").append(event).append("\n");
         }
         
-        // Retry字段
         if (retry != null) {
-            sb.append("retry:").append(retry).append("\n");
+            sse.append("retry:").append(retry).append("\n");
         }
         
-        // Progress字段 - 作为单独的SSE字段（非标准但兼容）
         if (progress != null) {
-            sb.append("progress:").append(progress).append("\n");
+            sse.append("progress:").append(progress).append("\n");
         }
         
-        // Data字段 - 只包含data内容，其他字段作为SSE协议字段单独处理
         if (data != null) {
             String dataString = (data instanceof String) ? (String) data : String.valueOf(data);
-            sb.append("data:").append(dataString).append("\n");
+            String[] lines = dataString.split("\n", -1);
+            for (String line : lines) {
+                sse.append("data:").append(line).append("\n");
+            }
         }
         
-        // SSE消息结束标记
-        sb.append("\n");
+        sse.append("\n");
         
-        return sb.toString();
+        return sse.toString();
     }
     
     // ========== 便捷构建方法 ==========
