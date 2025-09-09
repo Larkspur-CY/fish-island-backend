@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>三种SSE格式对比演示</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            margin: 0;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #2c3e50;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2.2em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .test-sections { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 25px; 
+            margin-top: 20px; 
+        }
+        .test-section { 
+            border: 2px solid #e1e8ed; 
+            padding: 20px; 
+            border-radius: 12px; 
+            background: #fafbfc;
+            transition: all 0.3s ease;
+        }
+        .test-section:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .section-custom { border-left: 5px solid #3498db; }
+        .section-ai { border-left: 5px solid #e74c3c; }
+        .section-upload { border-left: 5px solid #2ecc71; }
+        .section-comparison { border-left: 5px solid #f39c12; }
+        
+        h3 {
+            margin-top: 0;
+            color: #2c3e50;
+            font-size: 1.3em;
+        }
+        
+        button { 
+            padding: 12px 20px; 
+            margin: 8px 5px; 
+            color: white; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn-custom { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .btn-ai { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .btn-upload { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .btn-stop { background: linear-gradient(135deg, #95a5a6, #7f8c8d); }
+        
+        button:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        button:disabled { 
+            background: #bdc3c7; 
+            transform: none;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+        
+        .input-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .result { 
+            border: 2px solid #e1e8ed; 
+            padding: 20px; 
+            margin: 15px 0; 
+            min-height: 120px; 
+            background: white;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            line-height: 1.6;
+        }
+        
+        .event-display {
+            margin: 8px 0;
+            padding: 10px;
+            border-radius: 6px;
+            border-left: 4px solid #ddd;
+        }
+        .event-message { border-left-color: #3498db; background: #f8f9fa; }
+        .event-progress { border-left-color: #f39c12; background: #fff3cd; }
+        .event-thinking { border-left-color: #9b59b6; background: #f4ecf7; }
+        .event-typing { border-left-color: #1abc9c; background: #e8f8f5; }
+        .event-complete { border-left-color: #27ae60; background: #d4edda; }
+        .event-error { border-left-color: #e74c3c; background: #f8d7da; }
+        .event-done { border-left-color: #6c757d; background: #e2e3e5; font-weight: bold; }
+        
+        .status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 8px 0;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status.connecting { background: #fff3cd; color: #856404; }
+        .status.connected { background: #d4edda; color: #155724; }
+        .status.completed { background: #d1ecf1; color: #0c5460; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .comparison-info {
+            grid-column: 1 / -1;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 20px;
+        }
+        .comparison-info h4 {
+            margin-top: 0;
+            font-size: 1.4em;
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .feature-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 三种SSE格式对比演示</h1>
+            <p>体验 Flux&lt;String&gt;、Flux&lt;ServerSentEvent&lt;T&gt;&gt; 和 Flux&lt;CustomSseEvent&lt;T&gt;&gt; 三种不同的SSE实现方式</p>
+        </div>
+        
+        <div class="test-sections">
+            <!-- 格式1：传统SSE字符串格式 -->
+            <div class="test-section section-custom">
+                <h3>📋 格式1：Flux&lt;String&gt;</h3>
+                <div class="status" id="customStatus">待测试</div>
+                
+                <div class="input-group">
+                    <label>处理消息：</label>
+                    <input type="text" id="customMessage" value="传统SSE格式测试" placeholder="输入处理消息">
+                </div>
+                
+                <button class="btn-custom" onclick="testCustomSse()">测试传统格式</button>
+                <button class="btn-stop" onclick="stopCustom()">停止</button>
+                
+                <div><strong>返回：SSE格式字符串</strong></div>
+                <div id="customResult" class="result">等待测试...</div>
+            </div>
+            
+            <!-- 格式2：Spring原生ServerSentEvent -->
+            <div class="test-section section-ai">
+                <h3>🌟 格式2：Flux&lt;ServerSentEvent&lt;T&gt;&gt;</h3>
+                <div class="status" id="serverSentStatus">待测试</div>
+                
+                <div class="input-group">
+                    <label>处理消息：</label>
+                    <input type="text" id="serverSentMessage" value="Spring原生格式测试" placeholder="输入处理消息">
+                </div>
+                
+                <button class="btn-ai" onclick="testServerSentEvent()">测试Spring原生</button>
+                <button class="btn-stop" onclick="stopServerSent()">停止</button>
+                
+                <div><strong>返回：Spring标准SSE对象</strong></div>
+                <div id="serverSentResult" class="result">等待测试...</div>
+            </div>
+            
+            <!-- 格式3：自定义泛型事件对象 -->
+            <div class="test-section section-upload">
+                <h3>🚀 格式3：Flux&lt;CustomSseEvent&lt;T&gt;&gt;</h3>
+                <div class="status" id="customEventStatus">待测试</div>
+                
+                <div class="input-group">
+                    <label>处理消息：</label>
+                    <input type="text" id="customEventMessage" value="自定义事件对象测试" placeholder="输入处理消息">
+                </div>
+                
+                <button class="btn-upload" onclick="testCustomSseEvent()">测试自定义对象</button>
+                <button class="btn-stop" onclick="stopCustomEvent()">停止</button>
+                
+                <div><strong>返回：CustomSseEvent对象（JSON格式）</strong></div>
+                <div id="customEventResult" class="result">等待测试...</div>
+            </div>
+            
+            <!-- AI聊天对比测试 -->
+            <div class="test-section section-comparison">
+                <h3>🤖 AI聊天对比测试</h3>
+                <div class="status" id="aiCompareStatus">待测试</div>
+                
+                <div class="input-group">
+                    <label>您的问题：</label>
+                    <textarea id="aiQuestion" placeholder="请输入您的问题">什么是Server-Sent Events？</textarea>
+                </div>
+                
+                <button class="btn-ai" onclick="testAiChatString()">传统格式 AI</button>
+                <button class="btn-custom" onclick="testAiChatServerSent()">Spring原生 AI</button>
+                <button class="btn-upload" onclick="testAiChatCustomEvent()">自定义对象 AI</button>
+                <button class="btn-stop" onclick="stopAiCompare()">停止</button>
+                
+                <div><strong>AI回复对比：</strong></div>
+                <div id="aiCompareResult" class="result">等待提问...</div>
+            </div>
+            
+            <!-- 文件上传进度对比 -->
+            <div class="test-section section-upload">
+                <h3>📤 文件上传进度对比</h3>
+                <div class="status" id="uploadCompareStatus">待测试</div>
+                
+                <div class="input-group">
+                    <label>文件名：</label>
+                    <input type="text" id="uploadFilename" value="document.pdf" placeholder="输入文件名">
+                </div>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" id="uploadProgress"></div>
+                </div>
+                
+                <button class="btn-ai" onclick="testFileUploadString()">传统格式上传</button>
+                <button class="btn-upload" onclick="testFileUploadCustomEvent()">自定义对象上传</button>
+                <button class="btn-stop" onclick="stopUploadCompare()">取消上传</button>
+                
+                <div><strong>上传详情对比：</strong></div>
+                <div id="uploadCompareResult" class="result">选择文件开始上传...</div>
+            </div>
+            
+            <!-- 对比传统SSE -->
+            <div class="test-section section-comparison">
+                <h3>⚖️ 格式对比总结</h3>
+                <div class="status" id="traditionalStatus">待测试</div>
+                
+                <button class="btn-custom" onclick="testAllFormatsComparison()">一键对比三种格式</button>
+                <button class="btn-stop" onclick="stopTraditional()">停止</button>
+                
+                <div><strong>三种格式对比结果：</strong></div>
+                <div id="traditionalResult" class="result">等待对比测试...</div>
+            </div>
+        </div>
+        
+        <div class="comparison-info">
+            <h4>🌟 三种SSE格式对比</h4>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <strong>🖼️ Flux&lt;String&gt;</strong><br>
+                    传统格式，返回SSE格式字符串，完全控制格式
+                </div>
+                <div class="feature-item">
+                    <strong>🌅 Flux&lt;ServerSentEvent&lt;T&gt;&gt;</strong><br>
+                    Spring标准格式，自动处理SSE协议，类型安全
+                </div>
+                <div class="feature-item">
+                    <strong>🚀 Flux&lt;CustomSseEvent&lt;T&gt;&gt;</strong><br>
+                    自定义泛型格式，保持完整对象结构，业务语义清晰
+                </div>
+                <div class="feature-item">
+                    <strong>📈 性能对比</strong><br>
+                    可以通过控制台网络面板查看不同格式的传输效率
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let customEventSource = null;
+        let serverSentEventSource = null;
+        let customEventObjectSource = null;
+        let aiCompareEventSource = null;
+        let uploadCompareEventSource = null;
+        let traditionalEventSource = null;
+        
+        function updateStatus(type, status, text) {
+            const statusDiv = document.getElementById(type + 'Status');
+            if (statusDiv) {
+                statusDiv.className = 'status ' + status;
+                statusDiv.textContent = text;
+            }
+        }
+        
+        function displayEvent(type, eventData) {
+            const resultDiv = document.getElementById(type + 'Result');
+            if (!resultDiv) return;
+            
+            const eventDiv = document.createElement('div');
+            eventDiv.className = 'event-display event-' + (eventData.event || 'message');
+            
+            let content = `<strong>[${eventData.event || 'message'}]</strong> `;
+            if (eventData.timestamp) {
+                const time = new Date(eventData.timestamp).toLocaleTimeString();
+                content += `<small>(${time})</small><br>`;
+            }
+            content += eventData.data || '';
+            
+            if (eventData.progress !== undefined) {
+                content += `<br><em>进度: ${eventData.progress}%</em>`;
+                
+                // 更新进度条（仅文件上传）
+                if (type === 'uploadCompare' && document.getElementById('uploadProgress')) {
+                    document.getElementById('uploadProgress').style.width = eventData.progress + '%';
+                }
+            }
+            if (eventData.status) {
+                content += ` <span style="color: #666;">[${eventData.status}]</span>`;
+            }
+            
+            eventDiv.innerHTML = content;
+            resultDiv.appendChild(eventDiv);
+            resultDiv.scrollTop = resultDiv.scrollHeight;
+        }
+        
+        // ========== 格式1：传统 Flux<String> 测试 ==========
+        
+        function testCustomSse() {
+            const message = document.getElementById('customMessage').value;
+            const url = `/api/chat/stream/custom-sse?message=${encodeURIComponent(message)}`;
+            startEventSourceTest(url, 'custom');
+        }
+        
+        // ========== 格式2：Spring 原生 ServerSentEvent 测试 ==========
+        
+        function testServerSentEvent() {
+            const message = document.getElementById('serverSentMessage').value;
+            const url = `/api/chat/stream/server-sent-event?message=${encodeURIComponent(message)}`;
+            startEventSourceTest(url, 'serverSent');
+        }
+        
+        // ========== 格式3：自定义 CustomSseEvent<T> 对象测试 ==========
+        
+        function testCustomSseEvent() {
+            const message = document.getElementById('customEventMessage').value;
+            const url = `/api/chat/stream/custom-sse-event?message=${encodeURIComponent(message)}`;
+            startEventSourceTest(url, 'customEvent');
+        }
+        
+        // ========== AI 聊天对比测试 ==========
+        
+        async function testAiChatString() {
+            const question = document.getElementById('aiQuestion').value;
+            
+            updateStatus('aiCompare', 'connecting', '连接中 (传统格式)...');
+            document.getElementById('aiCompareResult').innerHTML = '';
+            
+            try {
+                const response = await fetch('/api/chat/stream/ai-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                updateStatus('aiCompare', 'connected', '已连接 (传统格式)');
+                await processStreamResponse(response, 'aiCompare');
+                
+            } catch (error) {
+                updateStatus('aiCompare', 'error', '请求失败');
+                displayEvent('aiCompare', { 
+                    event: 'error', 
+                    data: '传统格式请求失败: ' + error.message, 
+                    timestamp: Date.now() 
+                });
+            }
+        }
+        
+        async function testAiChatServerSent() {
+            const question = document.getElementById('aiQuestion').value;
+            
+            updateStatus('aiCompare', 'connecting', '连接中 (Spring原生)...');
+            
+            try {
+                const response = await fetch('/api/chat/stream/ai-server-sent-event', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                updateStatus('aiCompare', 'connected', '已连接 (Spring原生)');
+                await processStreamResponse(response, 'aiCompare');
+                
+            } catch (error) {
+                updateStatus('aiCompare', 'error', '请求失败');
+                displayEvent('aiCompare', { 
+                    event: 'error', 
+                    data: 'Spring原生格式请求失败: ' + error.message, 
+                    timestamp: Date.now() 
+                });
+            }
+        }
+        
+        async function testAiChatCustomEvent() {
+            const question = document.getElementById('aiQuestion').value;
+            
+            updateStatus('aiCompare', 'connecting', '连接中 (自定义对象)...');
+            
+            try {
+                const response = await fetch('/api/chat/stream/ai-custom-sse-event', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                updateStatus('aiCompare', 'connected', '已连接 (自定义对象)');
+                await processStreamResponse(response, 'aiCompare');
+                
+            } catch (error) {
+                updateStatus('aiCompare', 'error', '请求失败');
+                displayEvent('aiCompare', { 
+                    event: 'error', 
+                    data: '自定义对象格式请求失败: ' + error.message, 
+                    timestamp: Date.now() 
+                });
+            }
+        }
+        
+        // ========== 文件上传对比测试 ==========
+        
+        async function testFileUploadString() {
+            const filename = document.getElementById('uploadFilename').value;
+            
+            updateStatus('uploadCompare', 'connecting', '准备上传 (传统格式)...');
+            document.getElementById('uploadCompareResult').innerHTML = '';
+            document.getElementById('uploadProgress').style.width = '0%';
+            
+            try {
+                const response = await fetch('/api/chat/stream/file-upload', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify({ filename: filename })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                updateStatus('uploadCompare', 'connected', '上传中 (传统格式)...');
+                await processStreamResponse(response, 'uploadCompare');
+                
+            } catch (error) {
+                updateStatus('uploadCompare', 'error', '上传失败');
+                displayEvent('uploadCompare', { 
+                    event: 'error', 
+                    data: '传统格式上传失败: ' + error.message, 
+                    timestamp: Date.now() 
+                });
+            }
+        }
+        
+        async function testFileUploadCustomEvent() {
+            const filename = document.getElementById('uploadFilename').value;
+            
+            updateStatus('uploadCompare', 'connecting', '准备上传 (自定义对象)...');
+            document.getElementById('uploadProgress').style.width = '0%';
+            
+            try {
+                const response = await fetch('/api/chat/stream/file-upload-custom-sse-event', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream',
+                        'Cache-Control': 'no-cache'
+                    },
+                    body: JSON.stringify({ filename: filename })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                updateStatus('uploadCompare', 'connected', '上传中 (自定义对象)...');
+                await processStreamResponse(response, 'uploadCompare');
+                
+            } catch (error) {
+                updateStatus('uploadCompare', 'error', '上传失败');
+                displayEvent('uploadCompare', { 
+                    event: 'error', 
+                    data: '自定义对象格式上传失败: ' + error.message, 
+                    timestamp: Date.now() 
+                });
+            }
+        }
+        
+        // ========== 通用处理函数 ==========
+        
+        async function processStreamResponse(response, type) {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                    updateStatus(type, 'completed', '传输完成');
+                    break;
+                }
+                
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+                
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                    if (line.trim() === '') continue;
+                    
+                    // 处理 event: 行
+                    if (line.startsWith('event:')) {
+                        // 在SSE中，event和data是分开的行，这里只是记录event类型
+                        continue;
+                    }
+                    
+                    if (line.startsWith('data:')) {
+                        const data = line.slice(5).trim();
+                        
+                        // 检查完成标志
+                        if (data === '[DONE]') {
+                            updateStatus(type, 'completed', '传输完成');
+                            return;
+                        }
+                        
+                        try {
+                            // 尝试解析为JSON对象（CustomSseEvent 格式）
+                            const jsonData = JSON.parse(data);
+                            
+                            // 检查是否为 done 事件且包含 [DONE] 数据
+                            if (jsonData.event === 'done' && jsonData.data === '[DONE]') {
+                                displayEvent(type, jsonData);
+                                updateStatus(type, 'completed', '传输完成');
+                                return;
+                            }
+                            
+                            displayEvent(type, jsonData);
+                        } catch (e) {
+                            // 普通文本数据
+                            displayEvent(type, { 
+                                event: 'message', 
+                                data: data, 
+                                timestamp: Date.now() 
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        
+        function startEventSourceTest(url, type) {
+            const eventSourceVar = type + 'EventSource';
+            
+            if (window[eventSourceVar]) {
+                window[eventSourceVar].close();
+            }
+            
+            updateStatus(type, 'connecting', '连接中...');
+            document.getElementById(type + 'Result').innerHTML = '';
+            
+            window[eventSourceVar] = new EventSource(url);
+            
+            window[eventSourceVar].onopen = function() {
+                updateStatus(type, 'connected', '已连接');
+            };
+            
+            window[eventSourceVar].onmessage = function(event) {
+                try {
+                    // 尝试解析JSON数据
+                    const eventData = JSON.parse(event.data);
+                    displayEvent(type, eventData);
+                } catch (e) {
+                    // 普通文本数据
+                    if (event.data === '[DONE]') {
+                        updateStatus(type, 'completed', '传输完成');
+                        window[eventSourceVar].close();
+                        return;
+                    }
+                    
+                    displayEvent(type, { 
+                        event: 'message', 
+                        data: event.data, 
+                        timestamp: Date.now() 
+                    });
+                }
+            };
+            
+            // 监听自定义事件类型
+            ['progress', 'thinking', 'typing', 'complete', 'error', 'done'].forEach(eventType => {
+                window[eventSourceVar].addEventListener(eventType, function(event) {
+                    let eventData = {
+                        event: eventType,
+                        data: event.data,
+                        timestamp: Date.now()
+                    };
+                    
+                    // 尝试解析JSON数据获取更多信息
+                    try {
+                        const parsed = JSON.parse(event.data);
+                        eventData = { ...eventData, ...parsed };
+                    } catch (e) {
+                        // 忽略解析错误，使用原始数据
+                    }
+                    
+                    displayEvent(type, eventData);
+                    
+                    if (eventType === 'done' && (event.data === '[DONE]' || eventData.data === '[DONE]')) {
+                        updateStatus(type, 'completed', '传输完成');
+                        window[eventSourceVar].close();
+                    } else if (eventType === 'complete') {
+                        updateStatus(type, 'completed', '传输完成');
+                    } else if (eventType === 'error') {
+                        updateStatus(type, 'error', '发生错误');
+                    }
+                });
+            });
+            
+            window[eventSourceVar].onerror = function(error) {
+                if (window[eventSourceVar].readyState === EventSource.CLOSED) {
+                    return;
+                }
+                updateStatus(type, 'error', '连接错误');
+            };
+        }
+        
+        // ========== 一键对比测试 ==========
+        
+        function testAllFormatsComparison() {
+            updateStatus('traditional', 'connecting', '开始三种格式对比测试...');
+            document.getElementById('traditionalResult').innerHTML = '';
+            
+            // 依次测试三种格式
+            setTimeout(() => {
+                displayEvent('traditional', { 
+                    event: 'message', 
+                    data: '🔄 开始测试 Flux<String> 格式...', 
+                    timestamp: Date.now() 
+                });
+                testCustomSse();
+            }, 500);
+            
+            setTimeout(() => {
+                displayEvent('traditional', { 
+                    event: 'message', 
+                    data: '🔄 开始测试 Flux<ServerSentEvent<T>> 格式...', 
+                    timestamp: Date.now() 
+                });
+                testServerSentEvent();
+            }, 3000);
+            
+            setTimeout(() => {
+                displayEvent('traditional', { 
+                    event: 'message', 
+                    data: '🔄 开始测试 Flux<CustomSseEvent<T>> 格式...', 
+                    timestamp: Date.now() 
+                });
+                testCustomSseEvent();
+            }, 6000);
+            
+            setTimeout(() => {
+                displayEvent('traditional', { 
+                    event: 'complete', 
+                    data: '✅ 三种格式对比测试完成！请查看各个面板的输出结果。', 
+                    timestamp: Date.now() 
+                });
+                updateStatus('traditional', 'completed', '对比测试完成');
+            }, 12000);
+        }
+        
+        // ========== 停止函数 ==========
+        
+        function stopCustom() {
+            if (customEventSource) {
+                customEventSource.close();
+                updateStatus('custom', 'error', '手动停止');
+            }
+        }
+        
+        function stopServerSent() {
+            if (serverSentEventSource) {
+                serverSentEventSource.close();
+                updateStatus('serverSent', 'error', '手动停止');
+            }
+        }
+        
+        function stopCustomEvent() {
+            if (customEventObjectSource) {
+                customEventObjectSource.close();
+                updateStatus('customEvent', 'error', '手动停止');
+            }
+        }
+        
+        function stopAiCompare() {
+            updateStatus('aiCompare', 'error', '手动停止');
+        }
+        
+        function stopUploadCompare() {
+            updateStatus('uploadCompare', 'error', '取消上传');
+            if (document.getElementById('uploadProgress')) {
+                document.getElementById('uploadProgress').style.width = '0%';
+            }
+        }
+        
+        function stopTraditional() {
+            if (traditionalEventSource) {
+                traditionalEventSource.close();
+            }
+            updateStatus('traditional', 'error', '手动停止');
+        }
+    </script>
+</body>
+</html>

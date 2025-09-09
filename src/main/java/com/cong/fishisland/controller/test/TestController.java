@@ -62,6 +62,20 @@ public class TestController {
                     .body("对比测试页面未找到");
         }
     }
+    
+    @GetMapping("/post-sse")
+    public ResponseEntity<String> postSseTestPage() {
+        try {
+            ClassPathResource resource = new ClassPathResource("static/post-sse-test.html");
+            String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(content);
+        } catch (IOException e) {
+            return ResponseEntity.status(404)
+                    .body("POST + SSE 测试页面未找到");
+        }
+    }
 
     @GetMapping("/ai/chat")
     public ResponseEntity<String> aiChatPage() {
@@ -74,6 +88,20 @@ public class TestController {
         } catch (IOException e) {
             return ResponseEntity.status(404)
                     .body("简单测试页面未找到");
+        }
+    }
+    
+    @GetMapping("/custom-sse")
+    public ResponseEntity<String> customSsePage() {
+        try {
+            ClassPathResource resource = new ClassPathResource("static/custom-sse-demo.html");
+            String content = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(content);
+        } catch (IOException e) {
+            return ResponseEntity.status(404)
+                    .body("自定义SSE演示页面未找到");
         }
     }
 }
