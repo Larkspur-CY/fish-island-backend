@@ -19,6 +19,7 @@ import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.Future;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 import javax.annotation.PostConstruct;
@@ -33,7 +34,8 @@ import javax.annotation.PreDestroy;
 @Slf4j
 @Configuration
 public class NettyWebSocketServer {
-    public static final int WEB_SOCKET_PORT = 8090;
+    @Value("${websocket.port:8090}")
+    private int webSocketPort;
     // 创建线程池执行器
     private final EventLoopGroup bossGroup = new NioEventLoopGroup(1);
     private final EventLoopGroup workerGroup = new NioEventLoopGroup(8);
@@ -95,8 +97,8 @@ public class NettyWebSocketServer {
                     }
                 });
         // 启动服务器，监听端口，阻塞直到启动成功
-        serverBootstrap.bind(WEB_SOCKET_PORT).sync();
-        log.info("Netty启动成功");
+        serverBootstrap.bind(webSocketPort).sync();
+        log.info("Netty启动成功，端口：{}", webSocketPort);
     }
 
 }
